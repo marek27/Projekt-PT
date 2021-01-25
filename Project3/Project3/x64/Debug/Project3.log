@@ -1,2 +1,2 @@
 ﻿  try.cpp
-  Project3.vcxproj -> C:\Users\Admin\source\repos\Project3\x64\Debug\Project3.exe
+C:\Users\User\Documents\GitHub\Projekt-PT\Project3\Project3\try.cpp(1,10): fatal error C1083: Nie można otworzyć pliku dołącz: 'opencv2/objdetect.hpp': No such file or directory
