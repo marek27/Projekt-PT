@@ -5,12 +5,16 @@
 #include <iostream>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/core.hpp>
-#include "face.hpp"
-#include "opencv2/objdetect/objdetect.hpp" 
-#include "face/facerec.hpp"
-#include "opencv2/core/eigen.hpp"
+#include "opencv2/face.hpp"
+#include "opencv2\highgui\highgui.hpp"
+#include "opencv2\objdetect\objdetect.hpp"
+#include "opencv2\opencv.hpp"
 #include<direct.h>
-
+#include "opencv2/core/core.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/objdetect/objdetect.hpp"
+#include "opencv2/face/facerec.hpp"
+#include <string> 
 
 using namespace cv::face;
 
@@ -20,7 +24,7 @@ void detectAndDisplay(Mat frame);
 void addFace();
 static void imgRead(vector<Mat>& images, vector<int>& labels);
 void eigenFaceTrainer();
-void  FaceRecognition();
+void FaceRecognition();
 
 CascadeClassifier face_cascade;
 CascadeClassifier eyes_cascade;
@@ -29,6 +33,7 @@ int filenumber = 0;
 string name;
 int main(int argc, const char** argv)
 {
+
     CommandLineParser parser(argc, argv,
         "{help h||}"
         "{face_cascade|data/haarcascades/haarcascade_frontalface_alt.xml|Path to face cascade.}"
@@ -39,16 +44,15 @@ int main(int argc, const char** argv)
     parser.printMessage();
     String face_cascade_name = samples::findFile(parser.get<String>("face_cascade"));
 
-    //-- 1. Load the cascades
     if (!face_cascade.load(face_cascade_name))
     {
         cout << "Error loading face cascade\n";
         return -1;
     };
-    \
-        int camera_device = parser.get<int>("camera");
+
+    int camera_device = parser.get<int>("camera");
+
     VideoCapture capture;
-    //-- 2. Read the video stream
     capture.open(camera_device);
     if (!capture.isOpened())
     {
@@ -63,18 +67,36 @@ int main(int argc, const char** argv)
             cout << "No captured frame -- Break!\n";
             break;
         }
-        //-- 3. Apply the classifier to the frame
-        //detectAndDisplay(frame);
-        //addFace();
-        eigenFaceTrainer();
-        FaceRecognition();
+
+        int choice;
+        cout << "1. Rozpoznaj twarz\n";
+        cout << "2. dodaj twarz\n";
+        cout << "Wybór: ";
+        cin >> choice;
+        switch (choice)
+        {
+        case 1:
+            detectAndDisplay(frame);
+            FaceRecognition();
+            break;
+        case 2:
+            addFace();
+            eigenFaceTrainer();
+            break;
+        default:
+            return 0;
+        }
+
         if (waitKey(10) == 27)
         {
-            break; // escape
+            break;
         }
     }
+
     return 0;
+
 }
+
 void detectAndDisplay(Mat frame)
 {
     Mat crop;
@@ -133,7 +155,7 @@ void detectAndDisplay(Mat frame)
 
 void addFace()
 {
-    cout << "\nEnter Your Name:  ";
+    cout << "\nPodaj swoje imie:  ";
     cin >> name;
 
     VideoCapture capture(0);
@@ -141,14 +163,13 @@ void addFace()
     if (!capture.isOpened())
         return;
 
-    if (!face_cascade.load("C:\\Dev\\vcpkg\\opencv\\build\\install\\etc\\haarcascades\\haarcascade_frontalface_alt.xml"))
+    if (!face_cascade.load("C:\\tools\\build\\install\\etc\\haarcascades\\haarcascade_frontalface_alt.xml"))
     {
         cout << "error" << endl;
         return;
     };
 
     Mat frame;
-    cout << "\nCapturing your face 10 times, Press 'C' 10 times keeping your face front of the camera";
     char key;
     int i = 0;
 
@@ -161,7 +182,7 @@ void addFace()
         i++;
         if (i == 10)
         {
-            cout << "Face Added";
+            cout << "Dodano twarz";
             break;
         }
         //break;
@@ -176,3 +197,135 @@ void addFace()
 
     return;
 }
+static void imgRead(vector<Mat>& images, vector<int>& labels) {
+    vector<cv::String> fn;
+    filename = "C:\\Dev\\Faces\\";
+    glob(filename, fn, false);
+
+    size_t count = fn.size();
+
+    for (size_t i = 0; i < count; i++)
+    {
+        string itsname = "";
+        char sep = '\\';
+        size_t j = fn[i].rfind(sep, fn[i].length());
+        if (j != string::npos)
+        {
+            itsname = (fn[i].substr(j + 1, fn[i].length() - j - 6));
+        }
+        images.push_back(imread(fn[i], 0));
+        labels.push_back(atoi(itsname.c_str()));
+    }
+}
+
+void eigenFaceTrainer() {
+    vector<Mat> images;
+    vector<int> labels;
+    imgRead(images, labels);
+
+    cout << "Trening rozpoczety" << endl;
+    Ptr<EigenFaceRecognizer> model = EigenFaceRecognizer::create();
+
+
+    model->train(images, labels);
+    model->save("C:\\Dev\\Faces\\eigenface.yml");
+
+    cout << "Trening skonczony" << endl;
+    waitKey(10000);
+}
+
+void  FaceRecognition() {
+
+    cout << "rozpoznawanie rozpoczete" << endl;
+    cv::Ptr<cv::face::FaceRecognizer> model = cv::face::FisherFaceRecognizer::create();
+    model->read("C:\\Dev\\Faces\\eigenface.yml");
+
+    Mat testSample = imread("C:\\Dev\\Faces\\0.jpg", 0);
+
+    int img_width = testSample.cols;
+    int img_height = testSample.rows;
+
+    string window = "Capture - face detection";
+
+    if (!face_cascade.load("C:\\tools\\build\\install\\etc\\haarcascades\\haarcascade_frontalface_alt.xml")) {
+        cout << " Error loading file" << endl;
+        return;
+    }
+
+    VideoCapture cap(0);
+
+
+    if (!cap.isOpened())
+    {
+        cout << "exit" << endl;
+        return;
+    }
+    namedWindow(window, 1);
+    long count = 0;
+    string Pname = "";
+
+    while (true)
+    {
+        vector<Rect> faces;
+        Mat frame;
+        Mat graySacleFrame;
+        Mat original;
+
+
+        cap >> frame;
+        cap.read(frame);
+        count = count + 1;
+
+        if (!frame.empty()) {
+            original = frame.clone();
+
+            cvtColor(original, graySacleFrame, COLOR_BGR2GRAY);
+            equalizeHist(graySacleFrame, graySacleFrame);
+
+            face_cascade.detectMultiScale(graySacleFrame, faces, 1.1, 3, 0, cv::Size(90, 90));
+
+            std::string frameset = std::to_string(count);
+            std::string faceset = std::to_string(faces.size());
+
+            int width = 0, height = 0;
+
+            cv::Rect roi;
+
+            for (int i = 0; i < faces.size(); i++)
+            {
+                Rect face_i = faces[i];
+
+                Mat face = graySacleFrame(face_i);
+
+                Mat face_resized;
+                cv::resize(face, face_resized, Size(img_width, img_height), 1.0, 1.0, INTER_CUBIC);
+
+                int label = -1; double confidence = 0;
+                model->predict(face_resized, label, confidence);
+
+                cout << " confidence " << confidence << " Label: " << label << endl;
+
+                Pname = to_string(label);
+
+                rectangle(original, face_i, CV_RGB(190, 0, 2), 1);
+                string text = Pname;
+
+                int pos_x = std::max(face_i.tl().x - 10, 0);
+                int pos_y = std::max(face_i.tl().y - 10, 0);
+
+                putText(original, text, Point(pos_x, pos_y), FONT_HERSHEY_COMPLEX_SMALL, 1.0, CV_RGB(190, 0, 2), 1.0);
+
+
+            }
+
+
+            putText(original, "Ramka: " + frameset, Point(30, 60), FONT_HERSHEY_COMPLEX_SMALL, 1.0, CV_RGB(0, 255, 0), 1.0);
+            putText(original, "Ilosc rozpoznanych osob " + to_string(faces.size()), Point(30, 90), FONT_HERSHEY_COMPLEX_SMALL, 1.0, CV_RGB(0, 255, 0), 1.0);
+
+            cv::imshow(window, original);
+
+        }
+        if (waitKey(30) >= 0) break;
+    }
+}
+
